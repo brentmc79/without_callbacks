@@ -24,20 +24,30 @@ class ActiveRecord::Base
         self.send(:define_method, callback) {true}
         hash
       end
-      yield
-      callback_methods.each_pair do |callback, method|
-        self.send(:remove_method, callback)
-        self.send(:define_method, callback, method)
+      begin
+        yield
+      rescue StandardError => e
+        raise e
+      ensure
+        callback_methods.each_pair do |callback, method|
+          self.send(:remove_method, callback)
+          self.send(:define_method, callback, method)
+        end
       end
     end
     
     def self.without_any_callbacks(&block)
       self.send(:define_method, :run_callbacks) {true}
       callbacks = ActiveRecord::Callbacks::CALLBACKS.select {|callback| self.defines_instance_method?(callback) }
-      self.without_specified_callbacks(callbacks) do
-        yield
+      begin
+        self.without_specified_callbacks(callbacks) do
+          yield
+        end
+      rescue StandardError => e
+        raise e
+      ensure
+        self.send(:remove_method, :run_callbacks)
       end
-      self.send(:remove_method, :run_callbacks)
     end
     
     def self.defines_instance_method?(method_name)
